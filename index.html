@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Scheduling Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landingPage" class="landing-page">
+        <div class="landing-content">
+            <div class="hero-section">
+                <i class="fas fa-microchip cpu-icon"></i>
+                <h1 class="hero-title">CPU Scheduling Simulator</h1>
+                <p class="hero-subtitle">Interactive visualization of operating system scheduling algorithms</p>
+            </div>
+
+            <div class="algorithm-cards">
+                <div class="algo-card" onclick="selectAlgorithm('fcfs')">
+                    <div class="card-icon">
+                        <i class="fas fa-stream"></i>
+                    </div>
+                    <h3>First Come First Serve</h3>
+                    <p>FCFS - Non-preemptive</p>
+                    <span class="card-tag">Simple</span>
+                </div>
+
+                <div class="algo-card" onclick="selectAlgorithm('sjf')">
+                    <div class="card-icon">
+                        <i class="fas fa-sort-amount-down"></i>
+                    </div>
+                    <h3>Shortest Job First</h3>
+                    <p>SJF - Non-preemptive</p>
+                    <span class="card-tag">Optimal</span>
+                </div>
+
+                <div class="algo-card" onclick="selectAlgorithm('srtf')">
+                    <div class="card-icon">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <h3>Shortest Remaining Time</h3>
+                    <p>SRTF - Preemptive</p>
+                    <span class="card-tag">Advanced</span>
+                </div>
+
+                <div class="algo-card" onclick="selectAlgorithm('priority')">
+                    <div class="card-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <h3>Priority Scheduling</h3>
+                    <p>Priority - Non-preemptive</p>
+                    <span class="card-tag">Flexible</span>
+                </div>
+
+                <div class="algo-card" onclick="selectAlgorithm('rr')">
+                    <div class="card-icon">
+                        <i class="fas fa-sync-alt"></i>
+                    </div>
+                    <h3>Round Robin</h3>
+                    <p>RR - Preemptive</p>
+                    <span class="card-tag">Fair</span>
+                </div>
+
+                <div class="algo-card" onclick="selectAlgorithm('mlq')">
+                    <div class="card-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <h3>Multilevel Queue</h3>
+                    <p>MLQ - Multiple Queues</p>
+                    <span class="card-tag">Advanced</span>
+                </div>
+            </div>
+
+            <div class="features-section">
+                <div class="feature-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Visual Gantt Charts</span>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Performance Metrics</span>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-table"></i>
+                    <span>Detailed Analysis</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Simulator -->
+    <div id="simulatorPage" class="container" style="display: none;">
+        <header>
+            <div class="header-content">
+                <button class="back-btn" onclick="goBackToLanding()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <div class="header-text">
+                    <h1><i class="fas fa-microchip"></i> CPU Scheduling Simulator</h1>
+                    <p class="subtitle" id="selectedAlgoName">First Come First Serve (FCFS)</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Algorithm Info -->
+            <section class="algo-info-section">
+                <div class="algo-info-card">
+                    <div class="info-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3 id="algoInfoTitle">Algorithm Information</h3>
+                    </div>
+                    <p id="algoDescription">First Come First Serve is the simplest scheduling algorithm that executes processes in the order they arrive.</p>
+                    <div id="quantumInput" class="quantum-control" style="display: none;">
+                        <label for="timeQuantum"><i class="fas fa-clock"></i> Time Quantum:</label>
+                        <input type="number" id="timeQuantum" value="2" min="1">
+                    </div>
+                    <div id="queueTypeInput" class="quantum-control" style="display: none;">
+                        <label for="queueType"><i class="fas fa-list"></i> Queue Type:</label>
+                        <select id="queueType">
+                            <option value="1">System (Highest Priority)</option>
+                            <option value="2">Interactive (Medium Priority)</option>
+                            <option value="3">Batch (Lowest Priority)</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Process Input -->
+            <section class="process-input">
+                <div class="section-header">
+                    <h2><i class="fas fa-plus-circle"></i> Add Processes</h2>
+                    <div class="quick-actions">
+                        <!-- Algorithm Switcher Dropdown -->
+                        <div class="algorithm-dropdown">
+                            <button class="algo-switcher-btn" onclick="toggleAlgoDropdown()">
+                                <i class="fas fa-microchip"></i>
+                                <span id="currentAlgoName">FCFS</span>
+                                <i class="fas fa-chevron-down dropdown-icon"></i>
+                            </button>
+                            <div class="algo-dropdown-menu" id="algoDropdownMenu">
+                                <div class="dropdown-item" onclick="switchAlgorithm('fcfs')">
+                                    <i class="fas fa-stream"></i>
+                                    <span>First Come First Serve</span>
+                                </div>
+                                <div class="dropdown-item" onclick="switchAlgorithm('sjf')">
+                                    <i class="fas fa-sort-amount-down"></i>
+                                    <span>Shortest Job First</span>
+                                </div>
+                                <div class="dropdown-item" onclick="switchAlgorithm('srtf')">
+                                    <i class="fas fa-hourglass-half"></i>
+                                    <span>Shortest Remaining Time</span>
+                                </div>
+                                <div class="dropdown-item" onclick="switchAlgorithm('priority')">
+                                    <i class="fas fa-layer-group"></i>
+                                    <span>Priority Scheduling</span>
+                                </div>
+                                <div class="dropdown-item" onclick="switchAlgorithm('rr')">
+                                    <i class="fas fa-sync-alt"></i>
+                                    <span>Round Robin</span>
+                                </div>
+                                <div class="dropdown-item" onclick="switchAlgorithm('mlq')">
+                                    <i class="fas fa-bars-staggered"></i>
+                                    <span>Multilevel Queue</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Number of Processes Stepper (Inline) -->
+                        <div class="stepper-inline">
+                            <button class="stepper-btn-inline" onclick="decrementProcessCount()" title="Decrease">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" id="processCount" class="stepper-input-inline" value="3" min="1" max="20" onchange="updateProcessInputTable()">
+                            <button class="stepper-btn-inline" onclick="incrementProcessCount()" title="Increase">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        
+                        <button class="btn btn-icon" onclick="loadSampleData()" title="Load Sample Data">
+                            <i class="fas fa-database"></i> Sample
+                        </button>
+                        <button class="btn btn-icon btn-danger" onclick="clearAllProcesses()" title="Clear All">
+                            <i class="fas fa-trash-alt"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Process Input Table -->
+                <div class="process-input-table-container">
+                    <table class="process-input-table" id="processInputTable">
+                        <thead>
+                            <tr>
+                                <th>Process</th>
+                                <th>Arrival Time</th>
+                                <th>Burst Time</th>
+                                <th id="priorityInputHeader" style="display: none;">Priority</th>
+                                <th id="queueTypeInputHeader" style="display: none;">Queue Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="processInputTableBody">
+                            <!-- Generated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Process Table -->
+            <section class="process-table-section">
+                <h2><i class="fas f id="queueTypeHeader" style="display: none;">Queue Type</th>
+                                <tha-list"></i> Process Queue <span class="process-count" id="processCount">(0)</span></h2>
+                <div class="table-container">
+                    <table id="processTable">
+                        <thead>
+                            <tr>
+                                <th>Process</th>
+                                <th>Arrival</th>
+                                <th>Burst</th>
+                                <th id="priorityHeader" style="display: none;">Priority</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="processTableBody">
+                            <tr class="empty-state">
+                                <td colspan="5">
+                                    <i class="fas fa-inbox"></i>
+                                    <p>No processes added yet</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary btn-large" onclick="runSimulation()">
+                    <i class="fas fa-play-circle"></i> Run Simulation
+                </button>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2><i class="fas fa-chart-line"></i> Simulation Results</h2>
+                
+                <!-- Gantt Chart -->
+                <div class="gantt-container">
+                    <h3><i class="fas fa-chart-bar"></i> Gantt Chart Timeline</h3>
+                    <div id="ganttChart" class="gantt-chart"></div>
+                    <div id="ganttTimeline" class="gantt-timeline"></div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="statistics">
+                    <h3><i class="fas fa-tachometer-alt"></i> Performance Metrics</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fas fa-clock"></i></div>
+                            <div class="metric-label">Avg Waiting Time</div>
+                            <div class="metric-value" id="avgWaitingTime">0</div>
+                            <div class="metric-unit">units</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fas fa-history"></i></div>
+                            <div class="metric-label">Avg Turnaround</div>
+                            <div class="metric-value" id="avgTurnaroundTime">0</div>
+                            <div class="metric-unit">units</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fas fa-bolt"></i></div>
+                            <div class="metric-label">Avg Response</div>
+                            <div class="metric-value" id="avgResponseTime">0</div>
+                            <div class="metric-unit">units</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i class="fas fa-microchip"></i></div>
+                            <div class="metric-label">CPU Utilization</div>
+                            <div class="metric-value" id="cpuUtilization">0%</div>
+                            <div class="metric-unit">efficiency</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual Charts Row -->
+                <div class="charts-row">
+                    <!-- Waiting Time Chart -->
+                    <div class="chart-container">
+                        <h3><i class="fas fa-clock"></i> Waiting Time by Process</h3>
+                        <div id="waitingTimeChart" class="pie-chart">
+                            <svg id="waitingTimeSVG" width="300" height="300" viewBox="0 0 300 300"></svg>
+                            <div id="waitingTimeLegend" class="chart-legend"></div>
+                        </div>
+                    </div>
+
+                    <!-- Turnaround Time Chart -->
+                    <div class="chart-container">
+                        <h3><i class="fas fa-history"></i> Turnaround Time by Process</h3>
+                        <div id="turnaroundTimeChart" class="pie-chart">
+                            <svg id="turnaroundTimeSVG" width="300" height="300" viewBox="0 0 300 300"></svg>
+                            <div id="turnaroundTimeLegend" class="chart-legend"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process State Diagram -->
+                <div class="state-diagram-container">
+                    <h3><i class="fas fa-project-diagram"></i> Process State Transitions</h3>
+                    <div id="stateDiagram" class="state-diagram">
+                        <div class="state-box state-new">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>New</span>
+                        </div>
+                        <div class="state-arrow">→</div>
+                        <div class="state-box state-ready">
+                            <i class="fas fa-pause-circle"></i>
+                            <span>Ready</span>
+                        </div>
+                        <div class="state-arrow">→</div>
+                        <div class="state-box state-running">
+                            <i class="fas fa-play-circle"></i>
+                            <span>Running</span>
+                        </div>
+                        <div class="state-arrow">→</div>
+                        <div class="state-box state-terminated">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Terminated</span>
+                        </div>
+                    </div>
+                    <div id="stateStats" class="state-stats"></div>
+                </div>
+
+                <!-- Detailed Process Table -->
+                <div class="detailed-results">
+                    <h3><i class="fas fa-table"></i> Detailed Process Information</h3>
+                    <div class="table-container">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Process</th>
+                                    <th>Arrival</th>
+                                    <th>Burst</th>
+                                    <th>Completion</th>
+                                    <th>Turnaround</th>
+                                    <th>Waiting</th>
+                                    <th>Response</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                <!-- Results will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p><i class="fas fa-code"></i> CPU Scheduling Simulator | Operating Systems Tool</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
