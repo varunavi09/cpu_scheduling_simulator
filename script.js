@@ -3,6 +3,7 @@ console.log('CPU Scheduler script loaded successfully!');
 let processes = [];
 let processCounter = 1;
 let currentAlgorithm = 'fcfs';
+let priorityMode = 'low'; // 'low' = lower number is higher priority, 'high' = higher number is higher priority
 
 // Color palette for processes
 const processColors = [
@@ -26,15 +27,19 @@ const algoInfo = {
     },
     priority: {
         name: 'Priority Scheduling',
-        description: 'Priority Scheduling executes processes based on priority values (lower number = higher priority). This non-preemptive algorithm may suffer from indefinite blocking or starvation.'
+        description: 'Priority Scheduling executes processes based on priority values. You can choose whether lower or higher numbers represent higher priority. This non-preemptive algorithm may suffer from indefinite blocking or starvation.'
     },
     rr: {
         name: 'Round Robin (RR)',
         description: 'Round Robin assigns a fixed time quantum to each process in a circular manner. This preemptive algorithm ensures fairness and good response time for interactive systems.'
     },
-    mlq: {
-        name: 'Multilevel Queue (MLQ)',
-        description: 'Multilevel Queue divides processes into different queues based on their type (System, Interactive, Batch). Each queue has different priority and uses FCFS. Higher priority queues are served first.'
+    priority_preemptive: {
+        name: 'Preemptive Priority Scheduling',
+        description: 'Preemptive Priority Scheduling can interrupt a running process if a higher-priority process arrives. You can choose whether lower or higher numbers represent higher priority. This algorithm provides better response time for high-priority processes but may cause more context switches.'
+    },
+    priority_rr: {
+        name: 'Priority Scheduling with Round Robin',
+        description: 'This hybrid algorithm combines Priority Scheduling with Round Robin. Processes are selected based on priority, but processes with equal priority are scheduled using Round Robin with a time quantum. This ensures fairness among same-priority processes while maintaining priority-based scheduling.'
     }
 };
 
@@ -48,6 +53,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function showLandingPage() {
     document.getElementById('landingPage').style.display = 'flex';
     document.getElementById('simulatorPage').style.display = 'none';
+    // Hide results when going back to landing page
+    document.getElementById('resultsSection').style.display = 'none';
 }
 
 // Select algorithm from landing page
@@ -56,8 +63,14 @@ function selectAlgorithm(algorithm) {
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('simulatorPage').style.display = 'block';
     
+    // Hide previous results
+    document.getElementById('resultsSection').style.display = 'none';
+    
     // Update algorithm info
     updateAlgorithmInfo(algorithm);
+    
+    // Update dropdown button text
+    updateCurrentAlgoName(algorithm);
     
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -79,36 +92,26 @@ function updateAlgorithmInfo(algorithm) {
     const priorityInputHeader = document.getElementById('priorityInputHeader');
     const priorityHeader = document.getElementById('priorityHeader');
     const quantumInput = document.getElementById('quantumInput');
-    const queueTypeInputForm = document.getElementById('queueTypeInputForm');
-    const queueTypeInputHeader = document.getElementById('queueTypeInputHeader');
-    const queueTypeHeader = document.getElementById('queueTypeHeader');
+    const priorityModeInput = document.getElementById('priorityModeInput');
 
     // Reset all
     if (priorityInput) priorityInput.style.display = 'none';
     if (priorityInputHeader) priorityInputHeader.style.display = 'none';
     if (priorityHeader) priorityHeader.style.display = 'none';
     if (quantumInput) quantumInput.style.display = 'none';
-    if (queueTypeInputForm) queueTypeInputForm.style.display = 'none';
-    if (queueTypeInputHeader) queueTypeInputHeader.style.display = 'none';
-    if (queueTypeHeader) queueTypeHeader.style.display = 'none';
+    if (priorityModeInput) priorityModeInput.style.display = 'none';
 
     // Show/hide priority input
-    if (algorithm === 'priority') {
+    if (algorithm === 'priority' || algorithm === 'priority_preemptive' || algorithm === 'priority_rr') {
         if (priorityInput) priorityInput.style.display = 'flex';
         if (priorityInputHeader) priorityInputHeader.style.display = 'table-cell';
         if (priorityHeader) priorityHeader.style.display = 'table-cell';
+        if (priorityModeInput) priorityModeInput.style.display = 'flex';
     }
 
     // Show/hide time quantum input
-    if (algorithm === 'rr') {
+    if (algorithm === 'rr' || algorithm === 'priority_rr') {
         if (quantumInput) quantumInput.style.display = 'flex';
-    }
-
-    // Show/hide queue type input
-    if (algorithm === 'mlq') {
-        if (queueTypeInputForm) queueTypeInputForm.style.display = 'flex';
-        if (queueTypeInputHeader) queueTypeInputHeader.style.display = 'table-cell';
-        if (queueTypeHeader) queueTypeHeader.style.display = 'table-cell';
     }
 
     // Initialize process input table
@@ -150,6 +153,9 @@ function switchAlgorithm(algorithm) {
     updateCurrentAlgoName(algorithm);
     toggleAlgoDropdown();
     
+    // Hide previous results
+    document.getElementById('resultsSection').style.display = 'none';
+    
     // Clear processes and reset
     processes = [];
     processCounter = 1;
@@ -167,7 +173,8 @@ function updateCurrentAlgoName(algorithm) {
         'srtf': 'SRTF',
         'priority': 'Priority',
         'rr': 'Round Robin',
-        'mlq': 'MLQ'
+        'priority_preemptive': 'Preemptive Priority',
+        'priority_rr': 'Priority with RR'
     };
     document.getElementById('currentAlgoName').textContent = algoNames[algorithm];
 }
@@ -185,12 +192,6 @@ function updateProcessInputTable() {
     const processCount = parseInt(document.getElementById('processCount').value) || 3;
     const tbody = document.getElementById('processInputTableBody');
     tbody.innerHTML = '';
-    
-    const queueTypeOptions = `
-        <option value="1">System</option>
-        <option value="2">Interactive</option>
-        <option value="3">Batch</option>
-    `;
 
     for (let i = 1; i <= processCount; i++) {
         const row = document.createElement('tr');
@@ -198,8 +199,7 @@ function updateProcessInputTable() {
             <td><strong>P${i}</strong></td>
             <td><input type="number" class="table-input" id="arrival_${i}" value="0" min="0" placeholder="0"></td>
             <td><input type="number" class="table-input" id="burst_${i}" value="" min="1" placeholder="Enter" required></td>
-            ${currentAlgorithm === 'priority' ? `<td><input type="number" class="table-input" id="priority_${i}" value="1" min="1" placeholder="1"></td>` : ''}
-            ${currentAlgorithm === 'mlq' ? `<td><select class="table-select" id="queueType_${i}">${queueTypeOptions}</select></td>` : ''}
+            ${(currentAlgorithm === 'priority' || currentAlgorithm === 'priority_preemptive' || currentAlgorithm === 'priority_rr') ? `<td><input type="number" class="table-input" id="priority_${i}" value="1" min="1" placeholder="1"></td>` : ''}
         `;
         tbody.appendChild(row);
     }
@@ -226,16 +226,40 @@ function addAllProcesses() {
             burstInput.style.borderColor = '';
         }
 
-        const arrivalTime = parseInt(document.getElementById(`arrival_${i}`).value) || 0;
-        const priority = currentAlgorithm === 'priority' ? (parseInt(document.getElementById(`priority_${i}`).value) || 1) : 1;
-        const queueType = currentAlgorithm === 'mlq' ? (parseInt(document.getElementById(`queueType_${i}`).value) || 1) : 1;
+        const arrivalInput = document.getElementById(`arrival_${i}`);
+        const arrivalTime = parseInt(arrivalInput.value);
+        
+        if (isNaN(arrivalTime) || arrivalTime < 0) {
+            showNotification(`Please enter a valid arrival time (>= 0) for P${i}`, 'error');
+            arrivalInput.focus();
+            arrivalInput.style.borderColor = '#ff4757';
+            hasError = true;
+            break;
+        } else {
+            arrivalInput.style.borderColor = '';
+        }
+        
+        let priority = 1;
+        if (currentAlgorithm === 'priority' || currentAlgorithm === 'priority_preemptive' || currentAlgorithm === 'priority_rr') {
+            const priorityInput = document.getElementById(`priority_${i}`);
+            priority = parseInt(priorityInput.value);
+            
+            if (!priority || priority <= 0) {
+                showNotification(`Please enter a valid priority (> 0) for P${i}`, 'error');
+                priorityInput.focus();
+                priorityInput.style.borderColor = '#ff4757';
+                hasError = true;
+                break;
+            } else {
+                priorityInput.style.borderColor = '';
+            }
+        }
 
         const process = {
             id: processCounter + i - 1,
             name: `P${processCounter + i - 1}`,
             arrivalTime: arrivalTime,
             burstTime: burstTime,
-            queueType: queueType,
             priority: priority,
             color: processColors[(processCounter + i - 2) % processColors.length]
         };
@@ -401,7 +425,6 @@ function updateProcessTable() {
     }
 
     document.getElementById('processCount').textContent = `(${processes.length})`;
-    const queueTypeNames = { 1: 'System', 2: 'Interactive', 3: 'Batch' };
 
     processes.forEach((process, index) => {
         const row = document.createElement('tr');
@@ -409,8 +432,7 @@ function updateProcessTable() {
             <td><span style="display: inline-block; width: 14px; height: 14px; background: ${process.color}; border-radius: 50%; margin-right: 10px;"></span><strong>${process.name}</strong></td>
             <td>${process.arrivalTime}</td>
             <td>${process.burstTime}</td>
-            ${currentAlgorithm === 'priority' ? `<td>${process.priority}</td>` : ''}
-            ${currentAlgorithm === 'mlq' ? `<td><span class="queue-badge queue-${process.queueType}">${queueTypeNames[process.queueType]}</span></td>` : ''}
+            ${(currentAlgorithm === 'priority' || currentAlgorithm === 'priority_preemptive' || currentAlgorithm === 'priority_rr') ? `<td>${process.priority}</td>` : ''}
             <td><button class="btn btn-danger" onclick="removeProcess(${index})" style="padding: 8px 16px; font-size: 13px;"><i class="fas fa-trash"></i></button></td>
         `;
         tbody.appendChild(row);
@@ -456,11 +478,12 @@ function loadSampleData() {
         }
     }
     
+    // Default sample data for all algorithms
     processes = [
-        { id: 1, name: 'P1', arrivalTime: 0, burstTime: 5, priority: 2, queueType: 1, color: processColors[0] },
-        { id: 2, name: 'P2', arrivalTime: 1, burstTime: 3, priority: 1, queueType: 2, color: processColors[1] },
-        { id: 3, name: 'P3', arrivalTime: 2, burstTime: 8, priority: 3, queueType: 3, color: processColors[2] },
-        { id: 4, name: 'P4', arrivalTime: 3, burstTime: 6, priority: 2, queueType: 2, color: processColors[3] }
+        { id: 1, name: 'P1', arrivalTime: 0, burstTime: 5, priority: 2, color: processColors[0] },
+        { id: 2, name: 'P2', arrivalTime: 1, burstTime: 3, priority: 1, color: processColors[1] },
+        { id: 3, name: 'P3', arrivalTime: 2, burstTime: 8, priority: 3, color: processColors[2] },
+        { id: 4, name: 'P4', arrivalTime: 3, burstTime: 6, priority: 2, color: processColors[3] }
     ];
     processCounter = 5;
     updateProcessTable();
@@ -502,8 +525,12 @@ function runSimulation() {
                 const quantum = parseInt(document.getElementById('timeQuantum').value) || 2;
                 results = scheduleRoundRobin(quantum);
                 break;
-            case 'mlq':
-                results = scheduleMultilevelQueue();
+            case 'priority_preemptive':
+                results = schedulePreemptivePriority();
+                break;
+            case 'priority_rr':
+                const quantumPRR = parseInt(document.getElementById('timeQuantum').value) || 2;
+                results = schedulePriorityRR(quantumPRR);
                 break;
             default:
                 showNotification('Invalid algorithm selected', 'error');
@@ -588,9 +615,11 @@ function scheduleSJF() {
             continue;
         }
 
-        const shortestJob = availableProcesses.reduce((min, p) => 
-            p.burstTime < min.burstTime ? p : min
-        );
+        const shortestJob = availableProcesses.reduce((min, p) => {
+            if (p.burstTime < min.burstTime) return p;
+            if (p.burstTime === min.burstTime && p.arrivalTime < min.arrivalTime) return p;
+            return min;
+        });
 
         const startTime = currentTime;
         const completionTime = startTime + shortestJob.burstTime;
@@ -654,9 +683,11 @@ function scheduleSRTF() {
             continue;
         }
 
-        const currentProcess = availableProcesses.reduce((min, p) =>
-            p.remainingTime < min.remainingTime ? p : min
-        );
+        const currentProcess = availableProcesses.reduce((min, p) => {
+            if (p.remainingTime < min.remainingTime) return p;
+            if (p.remainingTime === min.remainingTime && p.arrivalTime < min.arrivalTime) return p;
+            return min;
+        });
 
         if (currentProcess.startTime === -1) {
             currentProcess.startTime = currentTime;
@@ -698,12 +729,15 @@ function scheduleSRTF() {
     return { timeline, processResults };
 }
 
-// Priority Scheduling (Non-preemptive, lower number = higher priority)
+// Priority Scheduling (Non-preemptive)
 function schedulePriority() {
     const remainingProcesses = [...processes];
     let currentTime = 0;
     const timeline = [];
     const processResults = [];
+    
+    // Get priority mode from dropdown
+    const priorityModeValue = document.getElementById('priorityMode')?.value || 'low';
 
     while (remainingProcesses.length > 0) {
         const availableProcesses = remainingProcesses.filter(p => p.arrivalTime <= currentTime);
@@ -722,9 +756,18 @@ function schedulePriority() {
             continue;
         }
 
-        const highestPriority = availableProcesses.reduce((max, p) =>
-            p.priority < max.priority ? p : max
-        );
+        // Select process based on priority mode with FCFS tie-breaking
+        const highestPriority = priorityModeValue === 'low'
+            ? availableProcesses.reduce((max, p) => {
+                if (p.priority < max.priority) return p;
+                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
+                return max;
+              })
+            : availableProcesses.reduce((max, p) => {
+                if (p.priority > max.priority) return p;
+                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
+                return max;
+              });
 
         const startTime = currentTime;
         const completionTime = startTime + highestPriority.burstTime;
@@ -832,71 +875,32 @@ function scheduleRoundRobin(quantum) {
     return { timeline, processResults };
 }
 
-// Multilevel Queue Scheduling
-function scheduleMultilevelQueue() {
-    // Separate processes into different queues based on queue type
-    const systemQueue = processes.filter(p => p.queueType === 1).sort((a, b) => a.arrivalTime - b.arrivalTime);
-    const interactiveQueue = processes.filter(p => p.queueType === 2).sort((a, b) => a.arrivalTime - b.arrivalTime);
-    const batchQueue = processes.filter(p => p.queueType === 3).sort((a, b) => a.arrivalTime - b.arrivalTime);
-    
+// Preemptive Priority Scheduling
+function schedulePreemptivePriority() {
+    const processStates = processes.map(p => ({
+        ...p,
+        remainingTime: p.burstTime,
+        firstResponseTime: -1
+    }));
+
     let currentTime = 0;
     const timeline = [];
     const processResults = [];
+    let completed = 0;
     
-    // Process queues in order of priority: System > Interactive > Batch
-    const allQueues = [
-        { queue: systemQueue, name: 'System' },
-        { queue: interactiveQueue, name: 'Interactive' },
-        { queue: batchQueue, name: 'Batch' }
-    ];
-    
-    // Track which processes have been completed
-    const completed = new Set();
-    
-    while (completed.size < processes.length) {
-        let processExecuted = false;
-        
-        // Try to execute a process from the highest priority queue that has arrived
-        for (const { queue } of allQueues) {
-            const availableProcesses = queue.filter(p => 
-                p.arrivalTime <= currentTime && !completed.has(p.id)
-            );
-            
-            if (availableProcesses.length > 0) {
-                // Execute the first available process in this queue (FCFS within queue)
-                const process = availableProcesses[0];
-                const startTime = currentTime;
-                const completionTime = startTime + process.burstTime;
-                const turnaroundTime = completionTime - process.arrivalTime;
-                const waitingTime = turnaroundTime - process.burstTime;
-                const responseTime = startTime - process.arrivalTime;
-                
-                timeline.push({
-                    process: process.name,
-                    start: startTime,
-                    end: completionTime,
-                    color: process.color
-                });
-                
-                processResults.push({
-                    ...process,
-                    completionTime,
-                    turnaroundTime,
-                    waitingTime,
-                    responseTime
-                });
-                
-                currentTime = completionTime;
-                completed.add(process.id);
-                processExecuted = true;
-                break;
-            }
-        }
-        
-        // If no process was executed, jump to next arrival time
-        if (!processExecuted) {
-            const nextArrival = processes
-                .filter(p => p.arrivalTime > currentTime && !completed.has(p.id))
+    // Get priority mode from dropdown
+    const priorityModeValue = document.getElementById('priorityMode')?.value || 'low';
+
+    while (completed < processes.length) {
+        // Find available processes
+        const available = processStates.filter(p => 
+            p.arrivalTime <= currentTime && p.remainingTime > 0
+        );
+
+        if (available.length === 0) {
+            // CPU idle - jump to next arrival
+            const nextArrival = processStates
+                .filter(p => p.remainingTime > 0)
                 .reduce((min, p) => Math.min(min, p.arrivalTime), Infinity);
             
             if (nextArrival !== Infinity) {
@@ -907,12 +911,183 @@ function scheduleMultilevelQueue() {
                     color: '#e0e0e0'
                 });
                 currentTime = nextArrival;
-            } else {
-                break;
             }
+            continue;
+        }
+
+        // Select highest priority process based on mode with FCFS tie-breaking
+        const currentProcess = priorityModeValue === 'low'
+            ? available.reduce((max, p) => {
+                if (p.priority < max.priority) return p;
+                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
+                return max;
+              })
+            : available.reduce((max, p) => {
+                if (p.priority > max.priority) return p;
+                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
+                return max;
+              });
+
+        // Record first response time
+        if (currentProcess.firstResponseTime === -1) {
+            currentProcess.firstResponseTime = currentTime;
+        }
+
+        // Execute for 1 time unit
+        const lastBlock = timeline[timeline.length - 1];
+        if (lastBlock && lastBlock.process === currentProcess.name && lastBlock.end === currentTime) {
+            // Extend existing block
+            lastBlock.end = currentTime + 1;
+        } else {
+            // Create new block
+            timeline.push({
+                process: currentProcess.name,
+                start: currentTime,
+                end: currentTime + 1,
+                color: currentProcess.color
+            });
+        }
+
+        currentProcess.remainingTime--;
+        currentTime++;
+
+        // Check if process completed
+        if (currentProcess.remainingTime === 0) {
+            const completionTime = currentTime;
+            const turnaroundTime = completionTime - currentProcess.arrivalTime;
+            const waitingTime = turnaroundTime - currentProcess.burstTime;
+            const responseTime = currentProcess.firstResponseTime - currentProcess.arrivalTime;
+
+            processResults.push({
+                ...currentProcess,
+                completionTime,
+                turnaroundTime,
+                waitingTime,
+                responseTime
+            });
+            completed++;
         }
     }
+
+    return { timeline, processResults };
+}
+
+// Priority Scheduling with Round Robin (for equal priority processes)
+function schedulePriorityRR(quantum) {
+    const processStates = processes.map(p => ({
+        ...p,
+        remainingTime: p.burstTime,
+        firstResponseTime: -1,
+        queueEntry: 0 // Track when process entered current priority level
+    }));
+
+    let currentTime = 0;
+    const timeline = [];
+    const processResults = [];
+    const readyQueue = [];
+    let processIndex = 0;
+    let queueEntryCounter = 0;
     
+    // Get priority mode from dropdown
+    const priorityModeValue = document.getElementById('priorityMode')?.value || 'low';
+    
+    // Sort processes by arrival time
+    const sortedProcesses = [...processStates].sort((a, b) => a.arrivalTime - b.arrivalTime);
+
+    while (processResults.length < processes.length || readyQueue.length > 0) {
+        // Add newly arrived processes to ready queue
+        while (processIndex < sortedProcesses.length && sortedProcesses[processIndex].arrivalTime <= currentTime) {
+            sortedProcesses[processIndex].queueEntry = queueEntryCounter++;
+            readyQueue.push(sortedProcesses[processIndex]);
+            processIndex++;
+        }
+
+        // Remove completed processes from ready queue
+        const activeQueue = readyQueue.filter(p => p.remainingTime > 0);
+        readyQueue.length = 0;
+        readyQueue.push(...activeQueue);
+
+        if (readyQueue.length === 0) {
+            // CPU idle
+            if (processIndex < sortedProcesses.length) {
+                const nextArrival = sortedProcesses[processIndex].arrivalTime;
+                timeline.push({
+                    process: 'Idle',
+                    start: currentTime,
+                    end: nextArrival,
+                    color: '#e0e0e0'
+                });
+                currentTime = nextArrival;
+            }
+            continue;
+        }
+
+        // Find the highest priority among ready processes
+        let highestPriority;
+        if (priorityModeValue === 'low') {
+            highestPriority = Math.min(...readyQueue.map(p => p.priority));
+        } else {
+            highestPriority = Math.max(...readyQueue.map(p => p.priority));
+        }
+        
+        // Get all processes with the highest priority (maintain insertion order for RR)
+        const samePriorityProcesses = readyQueue
+            .filter(p => p.priority === highestPriority)
+            .sort((a, b) => a.queueEntry - b.queueEntry); // FIFO order within same priority
+        
+        // Execute the first process with highest priority
+        const currentProcess = samePriorityProcesses[0];
+        
+        // Remove from ready queue
+        const index = readyQueue.indexOf(currentProcess);
+        readyQueue.splice(index, 1);
+
+        // Record first response time
+        if (currentProcess.firstResponseTime === -1) {
+            currentProcess.firstResponseTime = currentTime;
+        }
+
+        // Execute for time quantum or remaining time
+        const executeTime = Math.min(quantum, currentProcess.remainingTime);
+        
+        timeline.push({
+            process: currentProcess.name,
+            start: currentTime,
+            end: currentTime + executeTime,
+            color: currentProcess.color
+        });
+
+        currentTime += executeTime;
+        currentProcess.remainingTime -= executeTime;
+
+        // Add newly arrived processes during execution
+        while (processIndex < sortedProcesses.length && sortedProcesses[processIndex].arrivalTime <= currentTime) {
+            sortedProcesses[processIndex].queueEntry = queueEntryCounter++;
+            readyQueue.push(sortedProcesses[processIndex]);
+            processIndex++;
+        }
+
+        // Check if process completed
+        if (currentProcess.remainingTime === 0) {
+            const completionTime = currentTime;
+            const turnaroundTime = completionTime - currentProcess.arrivalTime;
+            const waitingTime = turnaroundTime - currentProcess.burstTime;
+            const responseTime = currentProcess.firstResponseTime - currentProcess.arrivalTime;
+
+            processResults.push({
+                ...currentProcess,
+                completionTime,
+                turnaroundTime,
+                waitingTime,
+                responseTime
+            });
+        } else {
+            // Process not complete, add back to ready queue with new entry time
+            currentProcess.queueEntry = queueEntryCounter++;
+            readyQueue.push(currentProcess);
+        }
+    }
+
     return { timeline, processResults };
 }
 
@@ -991,6 +1166,7 @@ function displayResultsTable(processResults) {
 
     processResults.sort((a, b) => a.id - b.id).forEach(process => {
         const row = document.createElement('tr');
+        
         row.innerHTML = `
             <td><span style="display: inline-block; width: 12px; height: 12px; background: ${process.color}; border-radius: 50%; margin-right: 8px;"></span>${process.name}</td>
             <td>${process.arrivalTime}</td>

@@ -805,6 +805,19 @@ input::placeholder {
     color: white;
 }
 
+/* Queue Transitions Display */
+.queue-transitions {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e40af;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: inline-block;
+    border: 1px solid #93c5fd;
+}
+
 /* Tables */
 .table-container {
     overflow-x: auto;
