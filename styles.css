@@ -891,37 +891,51 @@ tbody tr:last-child td {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
-.gantt-chart {
-    display: flex;
+/* Gantt Chart Wrapper */
+.gantt-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 150px;
     background: white;
     border: 2px solid #ddd;
     border-radius: 10px;
     overflow-x: auto;
-    min-height: 90px;
-    padding: 15px;
-    margin-bottom: 10px;
+    overflow-y: visible;
     box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
 }
 
-.gantt-block {
+/* Gantt Bars Container */
+.gantt-bars {
+    position: relative;
+    width: 100%;
+    height: 80px;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* Individual Process Bar */
+.gantt-bar {
+    position: absolute;
+    top: 15px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     font-weight: 700;
     font-size: 15px;
-    border-right: 3px solid white;
-    min-width: 60px;
-    padding: 15px;
-    position: relative;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     animation: slideIn 0.5s ease-out;
     transition: all 0.3s;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.gantt-block:hover {
-    transform: scale(1.08);
+.gantt-bar:hover {
+    transform: translateY(-3px);
     z-index: 10;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
     filter: brightness(1.1);
@@ -930,36 +944,64 @@ tbody tr:last-child td {
 @keyframes slideIn {
     from {
         opacity: 0;
-        transform: translateX(-20px);
+        transform: translateY(-10px);
     }
     to {
         opacity: 1;
-        transform: translateX(0);
+        transform: translateY(0);
     }
 }
 
+/* Timeline Container */
 .gantt-timeline {
-    display: flex;
-    background: white;
-    border: 2px solid #ddd;
-    border-top: none;
-    border-radius: 0 0 10px 10px;
-    overflow-x: auto;
-    padding: 12px 15px;
+    position: relative;
+    width: 100%;
+    height: 50px;
+    padding: 0 15px;
+    border-top: 2px solid #ddd;
+    background: #f8f9fa;
+    box-sizing: border-box;
 }
 
-.timeline-marker {
-    min-width: 60px;
-    text-align: center;
-    font-size: 13px;
+/* Timeline Tick */
+.timeline-tick {
+    position: absolute;
+    bottom: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    transform: translateX(-50%);
+}
+
+/* First tick - align to left edge */
+.timeline-tick-first {
+    transform: translateX(0) !important;
+    align-items: flex-start;
+}
+
+/* Last tick - align to right edge */
+.timeline-tick-last {
+    transform: translateX(-100%) !important;
+    align-items: flex-end;
+}
+
+/* Tick Vertical Line */
+.tick-line {
+    width: 2px;
+    height: 20px;
+    background: #666;
+    margin-bottom: 5px;
+}
+
+/* Tick Label */
+.tick-label {
+    font-size: 12px;
     font-weight: 600;
     color: #666;
-    border-right: 1px solid #e0e0e0;
-    padding: 5px;
-}
-
-.timeline-marker:last-child {
-    border-right: none;
+    white-space: nowrap;
+    user-select: none;
 }
 
 /* Statistics */
@@ -1499,14 +1541,13 @@ footer i {
         grid-template-columns: 1fr;
     }
 
-    .gantt-block {
-        min-width: 40px;
+    .gantt-bar {
         font-size: 12px;
-        padding: 10px;
+        min-width: 40px;
     }
 
-    .timeline-marker {
-        min-width: 40px;
+    .tick-label {
+        font-size: 10px;
     }
 
     .section-header {

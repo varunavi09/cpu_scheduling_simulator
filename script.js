@@ -491,59 +491,92 @@ function loadSampleData() {
 }
 
 // Run the simulation
-function runSimulation() {
+function runSimulation(event) {
+    // If processes array is empty, automatically add processes from input table
     if (processes.length === 0) {
-        showNotification('Please add at least one process before running simulation', 'error');
-        document.getElementById('processName').focus();
-        return;
+        const processCount = parseInt(document.getElementById('processCount').value) || 3;
+        
+        // Check if user has filled in at least one burst time
+        let hasAnyInput = false;
+        for (let i = 1; i <= processCount; i++) {
+            const burstInput = document.getElementById(`burst_${i}`);
+            if (burstInput && burstInput.value && parseInt(burstInput.value) > 0) {
+                hasAnyInput = true;
+                break;
+            }
+        }
+        
+        if (hasAnyInput) {
+            // Automatically add processes from table
+            addAllProcesses();
+            
+            // If there was an error in addAllProcesses (validation failed), it won't add processes
+            if (processes.length === 0) {
+                return; // Exit, error message already shown by addAllProcesses
+            }
+        } else {
+            showNotification('Please enter burst times for at least one process', 'error');
+            const firstBurstInput = document.getElementById('burst_1');
+            if (firstBurstInput) firstBurstInput.focus();
+            return;
+        }
     }
 
     // Show loading state
-    const btn = event.target;
+    const btn = event ? event.target : document.querySelector('.btn-primary.btn-large');
+    if (!btn) {
+        console.error('Button element not found');
+        runSimulationCore();
+        return;
+    }
+    
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
     btn.disabled = true;
 
     // Simulate processing time for better UX
     setTimeout(() => {
-        let results;
-
-        switch (currentAlgorithm) {
-            case 'fcfs':
-                results = scheduleFCFS();
-                break;
-            case 'sjf':
-                results = scheduleSJF();
-                break;
-            case 'srtf':
-                results = scheduleSRTF();
-                break;
-            case 'priority':
-                results = schedulePriority();
-                break;
-            case 'rr':
-                const quantum = parseInt(document.getElementById('timeQuantum').value) || 2;
-                results = scheduleRoundRobin(quantum);
-                break;
-            case 'priority_preemptive':
-                results = schedulePreemptivePriority();
-                break;
-            case 'priority_rr':
-                const quantumPRR = parseInt(document.getElementById('timeQuantum').value) || 2;
-                results = schedulePriorityRR(quantumPRR);
-                break;
-            default:
-                showNotification('Invalid algorithm selected', 'error');
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                return;
-        }
-
-        displayResults(results);
+        runSimulationCore();
         btn.innerHTML = originalText;
         btn.disabled = false;
         showNotification('Simulation completed successfully!', 'success');
     }, 500);
+}
+
+// Core simulation logic
+function runSimulationCore() {
+    let results;
+
+    switch (currentAlgorithm) {
+        case 'fcfs':
+            results = scheduleFCFS();
+            break;
+        case 'sjf':
+            results = scheduleSJF();
+            break;
+        case 'srtf':
+            results = scheduleSRTF();
+            break;
+        case 'priority':
+            results = schedulePriority();
+            break;
+        case 'rr':
+            const quantum = parseInt(document.getElementById('timeQuantum').value) || 2;
+            results = scheduleRoundRobin(quantum);
+            break;
+        case 'priority_preemptive':
+            results = schedulePreemptivePriority();
+            break;
+        case 'priority_rr':
+            const quantumPRR = parseInt(document.getElementById('timeQuantum').value) || 2;
+            results = schedulePriorityRR(quantumPRR);
+            break;
+        default:
+            showNotification('Invalid algorithm selected', 'error');
+            return;
+    }
+
+    displayResults(results);
 }
 
 // First Come First Serve (FCFS)
@@ -1101,13 +1134,23 @@ function displayResults(results) {
     // Generate Gantt Chart
     generateGanttChart(timeline);
 
-    // Calculate and display metrics
-    const avgWaitingTime = (processResults.reduce((sum, p) => sum + p.waitingTime, 0) / processResults.length).toFixed(2);
-    const avgTurnaroundTime = (processResults.reduce((sum, p) => sum + p.turnaroundTime, 0) / processResults.length).toFixed(2);
-    const avgResponseTime = (processResults.reduce((sum, p) => sum + p.responseTime, 0) / processResults.length).toFixed(2);
-    const totalTime = Math.max(...timeline.map(t => t.end));
+    // Calculate and display metrics with safety checks
+    const totalTime = timeline.length > 0 ? Math.max(...timeline.map(t => t.end)) : 0;
     const idleTime = timeline.filter(t => t.process === 'Idle').reduce((sum, t) => sum + (t.end - t.start), 0);
-    const cpuUtilization = (((totalTime - idleTime) / totalTime) * 100).toFixed(2);
+    
+    // Protect against division by zero
+    const avgWaitingTime = processResults.length > 0 
+        ? (processResults.reduce((sum, p) => sum + p.waitingTime, 0) / processResults.length).toFixed(2) 
+        : '0.00';
+    const avgTurnaroundTime = processResults.length > 0 
+        ? (processResults.reduce((sum, p) => sum + p.turnaroundTime, 0) / processResults.length).toFixed(2) 
+        : '0.00';
+    const avgResponseTime = processResults.length > 0 
+        ? (processResults.reduce((sum, p) => sum + p.responseTime, 0) / processResults.length).toFixed(2) 
+        : '0.00';
+    const cpuUtilization = totalTime > 0 
+        ? (((totalTime - idleTime) / totalTime) * 100).toFixed(2) 
+        : '0.00';
 
     document.getElementById('avgWaitingTime').textContent = avgWaitingTime;
     document.getElementById('avgTurnaroundTime').textContent = avgTurnaroundTime;
@@ -1128,34 +1171,86 @@ function displayResults(results) {
 
 // Generate Gantt Chart
 function generateGanttChart(timeline) {
-    const ganttChart = document.getElementById('ganttChart');
+    const ganttBars = document.getElementById('ganttBars');
     const ganttTimeline = document.getElementById('ganttTimeline');
     
-    ganttChart.innerHTML = '';
+    // Safety check - ensure elements exist
+    if (!ganttBars || !ganttTimeline) {
+        console.error('Gantt chart elements not found. Please refresh the page (Ctrl+Shift+R).');
+        return;
+    }
+    
+    // Safety check - ensure timeline is valid
+    if (!timeline || timeline.length === 0) {
+        console.error('Timeline is empty or invalid.');
+        ganttBars.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No timeline data available</div>';
+        return;
+    }
+    
+    ganttBars.innerHTML = '';
     ganttTimeline.innerHTML = '';
 
     const totalTime = Math.max(...timeline.map(t => t.end));
-    const blockWidth = Math.max(60, 800 / totalTime);
+    
+    // Safety check - ensure totalTime is valid
+    if (totalTime === 0 || !isFinite(totalTime)) {
+        console.error('Invalid total time:', totalTime);
+        return;
+    }
 
+    // Create process bars with percentage-based positioning
     timeline.forEach(block => {
-        const duration = block.end - block.start;
-        const ganttBlock = document.createElement('div');
-        ganttBlock.className = 'gantt-block';
-        ganttBlock.style.width = `${duration * blockWidth}px`;
-        ganttBlock.style.background = block.color;
-        ganttBlock.textContent = block.process;
-        ganttBlock.title = `${block.process}: ${block.start} - ${block.end} (Duration: ${duration})`;
-        ganttChart.appendChild(ganttBlock);
+        const startPercent = (block.start / totalTime) * 100;
+        const widthPercent = ((block.end - block.start) / totalTime) * 100;
+        
+        const ganttBar = document.createElement('div');
+        ganttBar.className = 'gantt-bar';
+        ganttBar.style.left = `${startPercent}%`;
+        ganttBar.style.width = `${widthPercent}%`;
+        ganttBar.style.background = block.color;
+        ganttBar.textContent = block.process;
+        ganttBar.title = `${block.process}: ${block.start} - ${block.end} (Duration: ${block.end - block.start})`;
+        ganttBars.appendChild(ganttBar);
     });
 
-    // Create timeline markers
-    const uniqueTimes = [...new Set(timeline.flatMap(t => [t.start, t.end]))].sort((a, b) => a - b);
-    uniqueTimes.forEach(time => {
-        const marker = document.createElement('div');
-        marker.className = 'timeline-marker';
-        marker.style.width = `${blockWidth}px`;
-        marker.textContent = time;
-        ganttTimeline.appendChild(marker);
+    // Create timeline ticks only at process boundaries
+    const boundaryTimes = new Set();
+    timeline.forEach(block => {
+        boundaryTimes.add(block.start);
+        boundaryTimes.add(block.end);
+    });
+    
+    // Convert to sorted array
+    const sortedBoundaries = Array.from(boundaryTimes).sort((a, b) => a - b);
+    
+    // Create ticks only at boundary points
+    sortedBoundaries.forEach((time, index) => {
+        const positionPercent = (time / totalTime) * 100;
+        
+        // Create tick container
+        const tick = document.createElement('div');
+        tick.className = 'timeline-tick';
+        tick.style.left = `${positionPercent}%`;
+        
+        // Special positioning for first and last ticks to keep them visible
+        if (index === 0) {
+            tick.classList.add('timeline-tick-first');
+        } else if (index === sortedBoundaries.length - 1) {
+            tick.classList.add('timeline-tick-last');
+        }
+        
+        // Create vertical line
+        const tickLine = document.createElement('div');
+        tickLine.className = 'tick-line';
+        tick.appendChild(tickLine);
+        
+        // Create time label
+        const tickLabel = document.createElement('div');
+        tickLabel.className = 'tick-label';
+        tickLabel.textContent = time;
+        tick.appendChild(tickLabel);
+        
+        ganttTimeline.appendChild(tick);
     });
 }
 
