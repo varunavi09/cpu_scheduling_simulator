@@ -3,7 +3,7 @@ console.log('CPU Scheduler script loaded successfully!');
 let processes = [];
 let processCounter = 1;
 let currentAlgorithm = 'fcfs';
-let priorityMode = 'low'; // 'low' = lower number is higher priority, 'high' = higher number is higher priority
+let priorityMode = 'high'; // 'low' = lower number is higher priority, 'high' = higher number is higher priority
 
 // Color palette for processes
 const processColors = [
@@ -582,19 +582,22 @@ function runSimulationCore() {
 
 // First Come First Serve (FCFS)
 function scheduleFCFS() {
-    const sortedProcesses = [...processes].sort((a, b) => a.arrivalTime - b.arrivalTime);
+    // For FCFS, process in the order they "arrived" (P1, P2, P3, P4, P5)
+    // as per the problem statement: "processes are assumed to have arrived in the order P1, P2, P3, P4 and P5"
+    const sortedProcesses = [...processes].sort((a, b) => a.id - b.id);
     let currentTime = 0;
     const timeline = [];
     const processResults = [];
 
     sortedProcesses.forEach(process => {
+        // Wait for process to arrive if necessary
         const startTime = Math.max(currentTime, process.arrivalTime);
         const completionTime = startTime + process.burstTime;
         const turnaroundTime = completionTime - process.arrivalTime;
         const waitingTime = turnaroundTime - process.burstTime;
         const responseTime = startTime - process.arrivalTime;
 
-        // Add idle time if necessary
+        // Add idle time if CPU is waiting for process arrival
         if (startTime > currentTime) {
             timeline.push({
                 process: 'Idle',
@@ -627,86 +630,35 @@ function scheduleFCFS() {
 
 // Shortest Job First (SJF) - Non-preemptive
 function scheduleSJF() {
-    const remainingProcesses = [...processes];
-    let currentTime = 0;
-    const timeline = [];
-    const processResults = [];
-
-    while (remainingProcesses.length > 0) {
-        const availableProcesses = remainingProcesses.filter(p => p.arrivalTime <= currentTime);
-
-        if (availableProcesses.length === 0) {
-            const nextProcess = remainingProcesses.reduce((min, p) => 
-                p.arrivalTime < min.arrivalTime ? p : min
-            );
-            timeline.push({
-                process: 'Idle',
-                start: currentTime,
-                end: nextProcess.arrivalTime,
-                color: '#e0e0e0'
-            });
-            currentTime = nextProcess.arrivalTime;
-            continue;
-        }
-
-        const shortestJob = availableProcesses.reduce((min, p) => {
-            if (p.burstTime < min.burstTime) return p;
-            if (p.burstTime === min.burstTime && p.arrivalTime < min.arrivalTime) return p;
-            return min;
-        });
-
-        const startTime = currentTime;
-        const completionTime = startTime + shortestJob.burstTime;
-        const turnaroundTime = completionTime - shortestJob.arrivalTime;
-        const waitingTime = turnaroundTime - shortestJob.burstTime;
-        const responseTime = startTime - shortestJob.arrivalTime;
-
-        timeline.push({
-            process: shortestJob.name,
-            start: startTime,
-            end: completionTime,
-            color: shortestJob.color
-        });
-
-        processResults.push({
-            ...shortestJob,
-            completionTime,
-            turnaroundTime,
-            waitingTime,
-            responseTime
-        });
-
-        currentTime = completionTime;
-        remainingProcesses.splice(remainingProcesses.indexOf(shortestJob), 1);
-    }
-
-    return { timeline, processResults };
-}
-
-// Shortest Remaining Time First (SRTF) - Preemptive SJF
-function scheduleSRTF() {
-    const processQueue = processes.map(p => ({
-        ...p,
-        remainingTime: p.burstTime,
-        startTime: -1
-    }));
-
+    const n = processes.length;
+    const isDone = new Array(n).fill(false);
     let currentTime = 0;
     const timeline = [];
     const processResults = [];
     let completed = 0;
-    const n = processQueue.length;
 
     while (completed < n) {
-        const availableProcesses = processQueue.filter(
-            p => p.arrivalTime <= currentTime && p.remainingTime > 0
-        );
+        // Find process with shortest burst time among available processes
+        let idx = -1;
+        let minBurst = Infinity;
+        
+        for (let i = 0; i < n; i++) {
+            if (processes[i].arrivalTime <= currentTime && !isDone[i]) {
+                if (processes[i].burstTime < minBurst) {
+                    minBurst = processes[i].burstTime;
+                    idx = i;
+                }
+            }
+        }
 
-        if (availableProcesses.length === 0) {
-            const nextArrival = processQueue
-                .filter(p => p.remainingTime > 0)
-                .reduce((min, p) => Math.min(min, p.arrivalTime), Infinity);
-            
+        if (idx === -1) {
+            // No process available, move to next arrival time
+            let nextArrival = Infinity;
+            for (let i = 0; i < n; i++) {
+                if (!isDone[i] && processes[i].arrivalTime < nextArrival) {
+                    nextArrival = processes[i].arrivalTime;
+                }
+            }
             timeline.push({
                 process: 'Idle',
                 start: currentTime,
@@ -717,40 +669,276 @@ function scheduleSRTF() {
             continue;
         }
 
-        const currentProcess = availableProcesses.reduce((min, p) => {
-            if (p.remainingTime < min.remainingTime) return p;
-            if (p.remainingTime === min.remainingTime && p.arrivalTime < min.arrivalTime) return p;
-            return min;
+        const process = processes[idx];
+        const startTime = currentTime;
+        const completionTime = startTime + process.burstTime;
+        const turnaroundTime = completionTime - process.arrivalTime;
+        const waitingTime = turnaroundTime - process.burstTime;
+        const responseTime = startTime - process.arrivalTime;
+
+        timeline.push({
+            process: process.name,
+            start: startTime,
+            end: completionTime,
+            color: process.color
         });
 
-        if (currentProcess.startTime === -1) {
-            currentProcess.startTime = currentTime;
+        processResults.push({
+            ...process,
+            completionTime,
+            turnaroundTime,
+            waitingTime,
+            responseTime
+        });
+
+        currentTime = completionTime;
+        isDone[idx] = true;
+        completed++;
+    }
+
+    return { timeline, processResults };
+}
+
+// Shortest Remaining Time First (SRTF) - Preemptive SJF
+function scheduleSRTF() {
+    const n = processes.length;
+    const isDone = new Array(n).fill(false);
+    const remaining = processes.map(p => p.burstTime);
+    const startTimes = new Array(n).fill(-1);
+    let currentTime = 0;
+    const timeline = [];
+    const processResults = [];
+    let completed = 0;
+
+    while (completed < n) {
+        // Find process with shortest remaining time among available processes
+        let idx = -1;
+        let minRemaining = Infinity;
+        
+        for (let i = 0; i < n; i++) {
+            if (processes[i].arrivalTime <= currentTime && !isDone[i]) {
+                if (remaining[i] < minRemaining) {
+                    minRemaining = remaining[i];
+                    idx = i;
+                }
+            }
+        }
+
+        if (idx === -1) {
+            // No process available, move to next arrival time
+            let nextArrival = Infinity;
+            for (let i = 0; i < n; i++) {
+                if (!isDone[i] && processes[i].arrivalTime < nextArrival) {
+                    nextArrival = processes[i].arrivalTime;
+                }
+            }
+            timeline.push({
+                process: 'Idle',
+                start: currentTime,
+                end: nextArrival,
+                color: '#e0e0e0'
+            });
+            currentTime = nextArrival;
+            continue;
+        }
+
+        const process = processes[idx];
+        
+        // Record first start time
+        if (startTimes[idx] === -1) {
+            startTimes[idx] = currentTime;
         }
 
         // Execute for 1 time unit
         const lastBlock = timeline[timeline.length - 1];
-        if (lastBlock && lastBlock.process === currentProcess.name && lastBlock.end === currentTime) {
+        if (lastBlock && lastBlock.process === process.name && lastBlock.end === currentTime) {
             lastBlock.end = currentTime + 1;
         } else {
             timeline.push({
-                process: currentProcess.name,
+                process: process.name,
                 start: currentTime,
                 end: currentTime + 1,
-                color: currentProcess.color
+                color: process.color
             });
         }
 
-        currentProcess.remainingTime--;
+        remaining[idx]--;
         currentTime++;
 
-        if (currentProcess.remainingTime === 0) {
+        if (remaining[idx] === 0) {
             const completionTime = currentTime;
-            const turnaroundTime = completionTime - currentProcess.arrivalTime;
-            const waitingTime = turnaroundTime - currentProcess.burstTime;
-            const responseTime = currentProcess.startTime - currentProcess.arrivalTime;
+            const turnaroundTime = completionTime - process.arrivalTime;
+            const waitingTime = turnaroundTime - process.burstTime;
+            const responseTime = startTimes[idx] - process.arrivalTime;
 
             processResults.push({
-                ...currentProcess,
+                ...process,
+                completionTime,
+                turnaroundTime,
+                waitingTime,
+                responseTime
+            });
+            isDone[idx] = true;
+            completed++;
+        }
+    }
+
+    return { timeline, processResults };
+}
+
+// Priority Scheduling (Non-preemptive)
+function schedulePriority() {
+    const n = processes.length;
+    const isDone = new Array(n).fill(false);
+    let currentTime = 0;
+    const timeline = [];
+    const processResults = [];
+    let completed = 0;
+    
+    // Get priority mode from dropdown
+    const priorityModeValue = document.getElementById('priorityMode')?.value || 'high';
+
+    while (completed < n) {
+        // Find process with best priority among available processes
+        let idx = -1;
+        let bestPriority = (priorityModeValue === 'low') ? Infinity : -Infinity;
+        
+        for (let i = 0; i < n; i++) {
+            if (processes[i].arrivalTime <= currentTime && !isDone[i]) {
+                if (priorityModeValue === 'low') {
+                    if (processes[i].priority < bestPriority) {
+                        bestPriority = processes[i].priority;
+                        idx = i;
+                    }
+                } else {
+                    if (processes[i].priority > bestPriority) {
+                        bestPriority = processes[i].priority;
+                        idx = i;
+                    }
+                }
+            }
+        }
+
+        if (idx === -1) {
+            // No process available, move to next arrival time
+            let nextArrival = Infinity;
+            for (let i = 0; i < n; i++) {
+                if (!isDone[i] && processes[i].arrivalTime < nextArrival) {
+                    nextArrival = processes[i].arrivalTime;
+                }
+            }
+            timeline.push({
+                process: 'Idle',
+                start: currentTime,
+                end: nextArrival,
+                color: '#e0e0e0'
+            });
+            currentTime = nextArrival;
+            continue;
+        }
+
+        const process = processes[idx];
+        const startTime = currentTime;
+        const completionTime = startTime + process.burstTime;
+        const turnaroundTime = completionTime - process.arrivalTime;
+        const waitingTime = turnaroundTime - process.burstTime;
+        const responseTime = startTime - process.arrivalTime;
+
+        timeline.push({
+            process: process.name,
+            start: startTime,
+            end: completionTime,
+            color: process.color
+        });
+
+        processResults.push({
+            ...process,
+            completionTime,
+            turnaroundTime,
+            waitingTime,
+            responseTime
+        });
+
+        currentTime = completionTime;
+        isDone[idx] = true;
+        completed++;
+    }
+
+    return { timeline, processResults };
+}
+
+// Round Robin Scheduling
+function scheduleRoundRobin(quantum) {
+    const n = processes.length;
+    const remaining = processes.map(p => p.burstTime);
+    const startTimes = new Array(n).fill(-1);
+    let currentTime = 0;
+    const timeline = [];
+    const processResults = [];
+    let completed = 0;
+    
+    // Initialize queue with all processes in ID order (representing arrival order P1→P2→P3→P4→P5)
+    const readyQueue = [];
+    for (let i = 0; i < n; i++) {
+        readyQueue.push(i);
+    }
+
+    while (completed < n && readyQueue.length > 0) {
+        const idx = readyQueue.shift();
+        const process = processes[idx];
+
+        // Skip if process hasn't arrived yet or already completed
+        if (process.arrivalTime > currentTime || remaining[idx] === 0) {
+            // Put back at end if not completed
+            if (remaining[idx] > 0) {
+                readyQueue.push(idx);
+            }
+            // If no process ready, jump to next arrival
+            if (readyQueue.length > 0 && readyQueue.every(i => processes[i].arrivalTime > currentTime || remaining[i] === 0)) {
+                const nextIdx = readyQueue.find(i => remaining[i] > 0);
+                if (nextIdx !== undefined) {
+                    const nextArrival = processes[nextIdx].arrivalTime;
+                    timeline.push({
+                        process: 'Idle',
+                        start: currentTime,
+                        end: nextArrival,
+                        color: '#e0e0e0'
+                    });
+                    currentTime = nextArrival;
+                }
+            }
+            continue;
+        }
+
+        // Record first start time
+        if (startTimes[idx] === -1) {
+            startTimes[idx] = currentTime;
+        }
+
+        const executeTime = Math.min(quantum, remaining[idx]);
+        const endTime = currentTime + executeTime;
+        
+        timeline.push({
+            process: process.name,
+            start: currentTime,
+            end: endTime,
+            color: process.color
+        });
+
+        remaining[idx] -= executeTime;
+        currentTime = endTime;
+
+        // Add current process back to queue if not finished
+        if (remaining[idx] > 0) {
+            readyQueue.push(idx);
+        } else {
+            const completionTime = currentTime;
+            const turnaroundTime = completionTime - process.arrivalTime;
+            const waitingTime = turnaroundTime - process.burstTime;
+            const responseTime = startTimes[idx] - process.arrivalTime;
+
+            processResults.push({
+                ...process,
                 completionTime,
                 turnaroundTime,
                 waitingTime,
@@ -763,97 +951,49 @@ function scheduleSRTF() {
     return { timeline, processResults };
 }
 
-// Priority Scheduling (Non-preemptive)
-function schedulePriority() {
-    const remainingProcesses = [...processes];
+// Preemptive Priority Scheduling
+function schedulePreemptivePriority() {
+    const n = processes.length;
+    const isDone = new Array(n).fill(false);
+    const remaining = processes.map(p => p.burstTime);
+    const startTimes = new Array(n).fill(-1);
     let currentTime = 0;
     const timeline = [];
     const processResults = [];
+    let completed = 0;
     
     // Get priority mode from dropdown
-    const priorityModeValue = document.getElementById('priorityMode')?.value || 'low';
+    const priorityModeValue = document.getElementById('priorityMode')?.value || 'high';
 
-    while (remainingProcesses.length > 0) {
-        const availableProcesses = remainingProcesses.filter(p => p.arrivalTime <= currentTime);
-
-        if (availableProcesses.length === 0) {
-            const nextProcess = remainingProcesses.reduce((min, p) =>
-                p.arrivalTime < min.arrivalTime ? p : min
-            );
-            timeline.push({
-                process: 'Idle',
-                start: currentTime,
-                end: nextProcess.arrivalTime,
-                color: '#e0e0e0'
-            });
-            currentTime = nextProcess.arrivalTime;
-            continue;
+    while (completed < n) {
+        // Find process with best priority among available processes
+        let idx = -1;
+        let bestPriority = (priorityModeValue === 'low') ? Infinity : -Infinity;
+        
+        for (let i = 0; i < n; i++) {
+            if (processes[i].arrivalTime <= currentTime && !isDone[i]) {
+                if (priorityModeValue === 'low') {
+                    if (processes[i].priority < bestPriority) {
+                        bestPriority = processes[i].priority;
+                        idx = i;
+                    }
+                } else {
+                    if (processes[i].priority > bestPriority) {
+                        bestPriority = processes[i].priority;
+                        idx = i;
+                    }
+                }
+            }
         }
 
-        // Select process based on priority mode with FCFS tie-breaking
-        const highestPriority = priorityModeValue === 'low'
-            ? availableProcesses.reduce((max, p) => {
-                if (p.priority < max.priority) return p;
-                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
-                return max;
-              })
-            : availableProcesses.reduce((max, p) => {
-                if (p.priority > max.priority) return p;
-                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
-                return max;
-              });
-
-        const startTime = currentTime;
-        const completionTime = startTime + highestPriority.burstTime;
-        const turnaroundTime = completionTime - highestPriority.arrivalTime;
-        const waitingTime = turnaroundTime - highestPriority.burstTime;
-        const responseTime = startTime - highestPriority.arrivalTime;
-
-        timeline.push({
-            process: highestPriority.name,
-            start: startTime,
-            end: completionTime,
-            color: highestPriority.color
-        });
-
-        processResults.push({
-            ...highestPriority,
-            completionTime,
-            turnaroundTime,
-            waitingTime,
-            responseTime
-        });
-
-        currentTime = completionTime;
-        remainingProcesses.splice(remainingProcesses.indexOf(highestPriority), 1);
-    }
-
-    return { timeline, processResults };
-}
-
-// Round Robin Scheduling
-function scheduleRoundRobin(quantum) {
-    const processQueue = processes.map(p => ({
-        ...p,
-        remainingTime: p.burstTime,
-        startTime: -1
-    })).sort((a, b) => a.arrivalTime - b.arrivalTime);
-
-    let currentTime = 0;
-    const timeline = [];
-    const processResults = [];
-    const readyQueue = [];
-    let processIndex = 0;
-
-    while (processIndex < processQueue.length || readyQueue.length > 0) {
-        // Add newly arrived processes to ready queue
-        while (processIndex < processQueue.length && processQueue[processIndex].arrivalTime <= currentTime) {
-            readyQueue.push(processQueue[processIndex]);
-            processIndex++;
-        }
-
-        if (readyQueue.length === 0) {
-            const nextArrival = processQueue[processIndex].arrivalTime;
+        if (idx === -1) {
+            // No process available, move to next arrival time
+            let nextArrival = Infinity;
+            for (let i = 0; i < n; i++) {
+                if (!isDone[i] && processes[i].arrivalTime < nextArrival) {
+                    nextArrival = processes[i].arrivalTime;
+                }
+            }
             timeline.push({
                 process: 'Idle',
                 start: currentTime,
@@ -864,141 +1004,43 @@ function scheduleRoundRobin(quantum) {
             continue;
         }
 
-        const currentProcess = readyQueue.shift();
-
-        if (currentProcess.startTime === -1) {
-            currentProcess.startTime = currentTime;
-        }
-
-        const executeTime = Math.min(quantum, currentProcess.remainingTime);
+        const process = processes[idx];
         
-        timeline.push({
-            process: currentProcess.name,
-            start: currentTime,
-            end: currentTime + executeTime,
-            color: currentProcess.color
-        });
-
-        currentTime += executeTime;
-        currentProcess.remainingTime -= executeTime;
-
-        // Add newly arrived processes
-        while (processIndex < processQueue.length && processQueue[processIndex].arrivalTime <= currentTime) {
-            readyQueue.push(processQueue[processIndex]);
-            processIndex++;
-        }
-
-        if (currentProcess.remainingTime > 0) {
-            readyQueue.push(currentProcess);
-        } else {
-            const completionTime = currentTime;
-            const turnaroundTime = completionTime - currentProcess.arrivalTime;
-            const waitingTime = turnaroundTime - currentProcess.burstTime;
-            const responseTime = currentProcess.startTime - currentProcess.arrivalTime;
-
-            processResults.push({
-                ...currentProcess,
-                completionTime,
-                turnaroundTime,
-                waitingTime,
-                responseTime
-            });
-        }
-    }
-
-    return { timeline, processResults };
-}
-
-// Preemptive Priority Scheduling
-function schedulePreemptivePriority() {
-    const processStates = processes.map(p => ({
-        ...p,
-        remainingTime: p.burstTime,
-        firstResponseTime: -1
-    }));
-
-    let currentTime = 0;
-    const timeline = [];
-    const processResults = [];
-    let completed = 0;
-    
-    // Get priority mode from dropdown
-    const priorityModeValue = document.getElementById('priorityMode')?.value || 'low';
-
-    while (completed < processes.length) {
-        // Find available processes
-        const available = processStates.filter(p => 
-            p.arrivalTime <= currentTime && p.remainingTime > 0
-        );
-
-        if (available.length === 0) {
-            // CPU idle - jump to next arrival
-            const nextArrival = processStates
-                .filter(p => p.remainingTime > 0)
-                .reduce((min, p) => Math.min(min, p.arrivalTime), Infinity);
-            
-            if (nextArrival !== Infinity) {
-                timeline.push({
-                    process: 'Idle',
-                    start: currentTime,
-                    end: nextArrival,
-                    color: '#e0e0e0'
-                });
-                currentTime = nextArrival;
-            }
-            continue;
-        }
-
-        // Select highest priority process based on mode with FCFS tie-breaking
-        const currentProcess = priorityModeValue === 'low'
-            ? available.reduce((max, p) => {
-                if (p.priority < max.priority) return p;
-                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
-                return max;
-              })
-            : available.reduce((max, p) => {
-                if (p.priority > max.priority) return p;
-                if (p.priority === max.priority && p.arrivalTime < max.arrivalTime) return p;
-                return max;
-              });
-
-        // Record first response time
-        if (currentProcess.firstResponseTime === -1) {
-            currentProcess.firstResponseTime = currentTime;
+        // Record first start time
+        if (startTimes[idx] === -1) {
+            startTimes[idx] = currentTime;
         }
 
         // Execute for 1 time unit
         const lastBlock = timeline[timeline.length - 1];
-        if (lastBlock && lastBlock.process === currentProcess.name && lastBlock.end === currentTime) {
-            // Extend existing block
+        if (lastBlock && lastBlock.process === process.name && lastBlock.end === currentTime) {
             lastBlock.end = currentTime + 1;
         } else {
-            // Create new block
             timeline.push({
-                process: currentProcess.name,
+                process: process.name,
                 start: currentTime,
                 end: currentTime + 1,
-                color: currentProcess.color
+                color: process.color
             });
         }
 
-        currentProcess.remainingTime--;
+        remaining[idx]--;
         currentTime++;
 
-        // Check if process completed
-        if (currentProcess.remainingTime === 0) {
+        if (remaining[idx] === 0) {
             const completionTime = currentTime;
-            const turnaroundTime = completionTime - currentProcess.arrivalTime;
-            const waitingTime = turnaroundTime - currentProcess.burstTime;
-            const responseTime = currentProcess.firstResponseTime - currentProcess.arrivalTime;
+            const turnaroundTime = completionTime - process.arrivalTime;
+            const waitingTime = turnaroundTime - process.burstTime;
+            const responseTime = startTimes[idx] - process.arrivalTime;
 
             processResults.push({
-                ...currentProcess,
+                ...process,
                 completionTime,
                 turnaroundTime,
                 waitingTime,
                 responseTime
             });
+            isDone[idx] = true;
             completed++;
         }
     }
@@ -1023,10 +1065,13 @@ function schedulePriorityRR(quantum) {
     let queueEntryCounter = 0;
     
     // Get priority mode from dropdown
-    const priorityModeValue = document.getElementById('priorityMode')?.value || 'low';
+    const priorityModeValue = document.getElementById('priorityMode')?.value || 'high';
     
     // Sort processes by arrival time
-    const sortedProcesses = [...processStates].sort((a, b) => a.arrivalTime - b.arrivalTime);
+    const sortedProcesses = [...processStates].sort((a, b) => {
+        if (a.arrivalTime !== b.arrivalTime) return a.arrivalTime - b.arrivalTime;
+        return a.id - b.id; // Use process ID as tiebreaker
+    });
 
     while (processResults.length < processes.length || readyQueue.length > 0) {
         // Add newly arrived processes to ready queue
