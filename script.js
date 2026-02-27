@@ -478,16 +478,17 @@ function loadSampleData() {
         }
     }
     
-    // Default sample data for all algorithms
+    // Test data from Question 13 - CPU Scheduling Problem
     processes = [
-        { id: 1, name: 'P1', arrivalTime: 0, burstTime: 5, priority: 2, color: processColors[0] },
-        { id: 2, name: 'P2', arrivalTime: 1, burstTime: 3, priority: 1, color: processColors[1] },
-        { id: 3, name: 'P3', arrivalTime: 2, burstTime: 8, priority: 3, color: processColors[2] },
-        { id: 4, name: 'P4', arrivalTime: 3, burstTime: 6, priority: 2, color: processColors[3] }
+        { id: 1, name: 'P1', arrivalTime: 0, burstTime: 11, priority: 2, color: processColors[0] },
+        { id: 2, name: 'P2', arrivalTime: 0, burstTime: 3, priority: 1, color: processColors[1] },
+        { id: 3, name: 'P3', arrivalTime: 5, burstTime: 9, priority: 5, color: processColors[2] },
+        { id: 4, name: 'P4', arrivalTime: 2, burstTime: 4, priority: 4, color: processColors[3] },
+        { id: 5, name: 'P5', arrivalTime: 1, burstTime: 9, priority: 3, color: processColors[4] }
     ];
-    processCounter = 5;
+    processCounter = 6;
     updateProcessTable();
-    showNotification('Sample data loaded successfully!', 'success');
+    showNotification('Test data loaded successfully! (Question 13)', 'success');
 }
 
 // Run the simulation
@@ -561,14 +562,14 @@ function runSimulationCore() {
             results = schedulePriority();
             break;
         case 'rr':
-            const quantum = parseInt(document.getElementById('timeQuantum').value) || 2;
+            const quantum = parseInt(document.getElementById('timeQuantum').value) || 3;
             results = scheduleRoundRobin(quantum);
             break;
         case 'priority_preemptive':
             results = schedulePreemptivePriority();
             break;
         case 'priority_rr':
-            const quantumPRR = parseInt(document.getElementById('timeQuantum').value) || 2;
+            const quantumPRR = parseInt(document.getElementById('timeQuantum').value) || 3;
             results = schedulePriorityRR(quantumPRR);
             break;
         default:
